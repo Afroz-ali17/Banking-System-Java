@@ -1,0 +1,29 @@
+# Build and compilation outputs
+target/
+out/
+bin/
+
+# IDE configurations
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+
+# Sensitive files and credentials (passwords, secret keys, environment tokens)
+*.env
+.env*
+*password*
+*secret*
+*credentials*
+config.properties
+application-secret.properties
+*.key
+*.pem
+
+# OS metadata
+.DS_Store
+Thumbs.db
