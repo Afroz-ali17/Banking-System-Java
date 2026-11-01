@@ -18,6 +18,8 @@ bank/
     │   └── java/
     │       └── com/afroz/bank/
     │           ├── Account.java
+    │           ├── AccountNotFoundException.java
+    │           ├── Bank.java
     │           ├── CurrentAccount.java
     │           ├── InsufficientBalanceException.java
     │           ├── Main.java
@@ -26,7 +28,8 @@ bank/
     └── test/
         └── java/
             └── com/afroz/bank/
-                └── AccountTest.java
+                ├── AccountTest.java
+                └── BankTest.java
 ```
 
 ## How to Build and Run
