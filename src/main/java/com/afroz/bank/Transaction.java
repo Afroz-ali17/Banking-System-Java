@@ -13,6 +13,10 @@ public class Transaction {
         this.time = LocalDateTime.now();
     }
 
+    public String getType() { return type; }
+    public double getAmount() { return amount; }
+    public LocalDateTime getTime() { return time; }
+
     @Override
     public String toString() {
         return time.withNano(0) + " | " + type + " | " + amount;

@@ -95,6 +95,46 @@ public class Bank {
     }
 
     /**
+     * Transfers funds from one account to another.
+     * Validates that both accounts exist, the amount is positive, and the accounts differ.
+     * Withdraws from the source account as TRANSFER_OUT, then deposits into the target as TRANSFER_IN.
+     * If the deposit fails after the withdrawal, restores the source balance (manual rollback).
+     *
+     * @param fromAcc source account number
+     * @param toAcc   target account number
+     * @param amount  amount to transfer
+     * @throws AccountNotFoundException     if either source or target account is not found
+     * @throws InsufficientBalanceException if source account lacks required balance/overdraft
+     * @throws IllegalArgumentException     if amount <= 0 or source and target accounts are the same
+     */
+    public synchronized void transfer(String fromAcc, String toAcc, double amount)
+            throws AccountNotFoundException, InsufficientBalanceException {
+        if (fromAcc == null || toAcc == null) {
+            throw new IllegalArgumentException("Source and target account numbers cannot be null");
+        }
+        if (fromAcc.trim().equalsIgnoreCase(toAcc.trim())) {
+            throw new IllegalArgumentException("Cannot transfer to the same account: " + fromAcc);
+        }
+        if (amount <= 0) {
+            throw new IllegalArgumentException("Transfer amount must be positive. Provided: " + amount);
+        }
+
+        Account source = getAccount(fromAcc.trim());
+        Account target = getAccount(toAcc.trim());
+
+        // Step 1: Withdraw from source (recorded as TRANSFER_OUT)
+        source.transferOut(amount);
+
+        // Step 2: Deposit into target (recorded as TRANSFER_IN), with manual rollback on deposit failure
+        try {
+            target.transferIn(amount);
+        } catch (Exception e) {
+            source.restoreBalance(amount);
+            throw e;
+        }
+    }
+
+    /**
      * Lists all registered accounts to standard output and returns them as a List.
      *
      * @return a List containing all registered accounts
@@ -130,4 +170,3 @@ public class Bank {
         return accounts.size();
     }
 }
-

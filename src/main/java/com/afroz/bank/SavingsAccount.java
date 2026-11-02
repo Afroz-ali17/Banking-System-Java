@@ -8,11 +8,11 @@ public class SavingsAccount extends Account {
     }
 
     @Override
-    public synchronized void withdraw(double amount) throws InsufficientBalanceException {
+    public synchronized void withdraw(double amount, String transactionType) throws InsufficientBalanceException {
         if (amount <= 0) throw new IllegalArgumentException("Withdrawal must be positive");
         if (balance - amount < MIN_BALANCE)
             throw new InsufficientBalanceException("Savings must keep a minimum balance of " + MIN_BALANCE);
         balance -= amount;
-        record("WITHDRAW", amount);
+        record(transactionType, amount);
     }
 }

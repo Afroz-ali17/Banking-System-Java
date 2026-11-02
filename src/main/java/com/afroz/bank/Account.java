@@ -21,13 +21,44 @@ public abstract class Account {
     public List<Transaction> getHistory() { return history; }
 
     public synchronized void deposit(double amount) {
-        if (amount <= 0) throw new IllegalArgumentException("Deposit must be positive");
-        balance += amount;
-        history.add(new Transaction("DEPOSIT", amount));
+        deposit(amount, "DEPOSIT");
     }
 
-    // Each account type defines its own withdrawal rule (polymorphism)
-    public abstract void withdraw(double amount) throws InsufficientBalanceException;
+    public synchronized void deposit(double amount, String transactionType) {
+        if (amount <= 0) throw new IllegalArgumentException("Deposit must be positive");
+        balance += amount;
+        record(transactionType, amount);
+    }
+
+    // Default withdrawal records standard WITHDRAW
+    public void withdraw(double amount) throws InsufficientBalanceException {
+        withdraw(amount, "WITHDRAW");
+    }
+
+    // Each account type defines its own withdrawal rule (polymorphism) and records custom transaction type
+    public abstract void withdraw(double amount, String transactionType) throws InsufficientBalanceException;
+
+    public synchronized void transferOut(double amount) throws InsufficientBalanceException {
+        withdraw(amount, "TRANSFER_OUT");
+    }
+
+    public synchronized void transferIn(double amount) {
+        deposit(amount, "TRANSFER_IN");
+    }
+
+    /**
+     * Rolls back a failed transfer withdrawal by restoring the balance
+     * and removing the recorded TRANSFER_OUT transaction.
+     */
+    public synchronized void restoreBalance(double amount) {
+        balance += amount;
+        if (!history.isEmpty()) {
+            Transaction last = history.get(history.size() - 1);
+            if ("TRANSFER_OUT".equals(last.getType())) {
+                history.remove(history.size() - 1);
+            }
+        }
+    }
 
     protected void record(String type, double amount) {
         history.add(new Transaction(type, amount));

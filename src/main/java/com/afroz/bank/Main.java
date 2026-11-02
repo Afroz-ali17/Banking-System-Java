@@ -4,7 +4,11 @@ public class Main {
     public static void main(String[] args) {
         Bank bank = new Bank();
 
-        System.out.println("=== 1. Creating 3 Accounts through Bank ===");
+        System.out.println("==================================================");
+        System.out.println("          DAY 2: CORE BANKING & HASHMAP           ");
+        System.out.println("==================================================");
+
+        System.out.println("\n=== 1. Creating 3 Accounts through Bank ===");
         Account a1 = bank.createAccount("SAVINGS", "Afroz", 10000);
         Account a2 = bank.createAccount("CURRENT", "Ali", 2000);
         Account a3 = bank.createAccount("SAVINGS", "Sara", 5000);
@@ -13,7 +17,7 @@ public class Main {
         System.out.println("Created: " + a2);
         System.out.println("Created: " + a3);
 
-        System.out.println("\n=== 2. Performing Sample Transactions ===");
+        System.out.println("\n=== 2. Performing Sample Deposit / Withdrawal ===");
         try {
             a1.deposit(2500);
             a1.withdraw(3000);
@@ -29,8 +33,6 @@ public class Main {
         try {
             Account lookedUp = bank.getAccount("SB1001");
             System.out.println("Lookup result: " + lookedUp);
-            System.out.println("Transaction history for " + lookedUp.getAccountNumber() + ":");
-            lookedUp.getHistory().forEach(System.out::println);
         } catch (AccountNotFoundException e) {
             System.out.println("Lookup failed: " + e.getMessage());
         }
@@ -63,6 +65,67 @@ public class Main {
             System.out.println("Closed zero-balance account? " + closedZero);
         } catch (AccountNotFoundException e) {
             System.out.println("Error closing account: " + e.getMessage());
+        }
+
+        System.out.println("\n==================================================");
+        System.out.println("         DAY 3: INTER-ACCOUNT TRANSFERS           ");
+        System.out.println("==================================================");
+
+        // Demo 1: Successful Transfer
+        System.out.println("\n--- Demo 1: Successful Transfer ---");
+        try {
+            System.out.println("Before transfer:");
+            System.out.println("  Source: " + a1);
+            System.out.println("  Target: " + a2);
+
+            System.out.println("\nExecuting: bank.transfer(\"" + a1.getAccountNumber() + "\", \"" + a2.getAccountNumber() + "\", 1500)...");
+            bank.transfer(a1.getAccountNumber(), a2.getAccountNumber(), 1500);
+
+            System.out.println("\nAfter transfer:");
+            System.out.println("  Source: " + a1);
+            System.out.println("  Target: " + a2);
+
+            System.out.println("\nTransaction history for Source (" + a1.getAccountNumber() + "):");
+            a1.getHistory().forEach(System.out::println);
+
+            System.out.println("\nTransaction history for Target (" + a2.getAccountNumber() + "):");
+            a2.getHistory().forEach(System.out::println);
+        } catch (Exception e) {
+            System.out.println("Unexpected failure: " + e.getMessage());
+        }
+
+        // Demo 2: Transfer with Insufficient Funds
+        System.out.println("\n--- Demo 2: Transfer with Insufficient Funds ---");
+        try {
+            System.out.println("Attempting to transfer 50,000 from " + a1.getAccountNumber() + " (Balance: " + a1.getBalance() + ")...");
+            bank.transfer(a1.getAccountNumber(), a2.getAccountNumber(), 50000);
+        } catch (InsufficientBalanceException e) {
+            System.out.println("Caught expected InsufficientBalanceException: " + e.getMessage());
+            System.out.println("Source balance remained unchanged: " + a1.getBalance());
+        } catch (Exception e) {
+            System.out.println("Unexpected error: " + e.getMessage());
+        }
+
+        // Demo 3: Transfer with Unknown Account
+        System.out.println("\n--- Demo 3: Transfer with Unknown Account ---");
+        try {
+            System.out.println("Attempting to transfer from " + a1.getAccountNumber() + " to unknown account 'SB9999'...");
+            bank.transfer(a1.getAccountNumber(), "SB9999", 500);
+        } catch (AccountNotFoundException e) {
+            System.out.println("Caught expected AccountNotFoundException: " + e.getMessage());
+        } catch (Exception e) {
+            System.out.println("Unexpected error: " + e.getMessage());
+        }
+
+        // Demo 4: Same-Account Transfer
+        System.out.println("\n--- Demo 4: Same-Account Transfer ---");
+        try {
+            System.out.println("Attempting to transfer from " + a1.getAccountNumber() + " to " + a1.getAccountNumber() + "...");
+            bank.transfer(a1.getAccountNumber(), a1.getAccountNumber(), 500);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Caught expected IllegalArgumentException: " + e.getMessage());
+        } catch (Exception e) {
+            System.out.println("Unexpected error: " + e.getMessage());
         }
     }
 }
