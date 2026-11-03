@@ -20,6 +20,7 @@ bank/
     │           ├── Account.java
     │           ├── AccountNotFoundException.java
     │           ├── Bank.java
+    │           ├── BankApp.java
     │           ├── CurrentAccount.java
     │           ├── InsufficientBalanceException.java
     │           ├── Main.java
@@ -29,6 +30,7 @@ bank/
         └── java/
             └── com/afroz/bank/
                 ├── AccountTest.java
+                ├── BankAppTest.java
                 └── BankTest.java
 ```
 
@@ -54,5 +56,8 @@ java -jar target/bank-system-1.0-SNAPSHOT.jar
 ```bash
 # Windows PowerShell
 javac -d out (Get-ChildItem -Recurse src/main/java/*.java | % FullName)
+java -cp out com.afroz.bank.BankApp
+
+# Or to run the automated Days 1-3 demo suite:
 java -cp out com.afroz.bank.Main
 ```
