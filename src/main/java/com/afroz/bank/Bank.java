@@ -95,8 +95,10 @@ public class Bank {
     }
 
     /**
-     * Transfers funds from one account to another.
+     * Transfers funds from one account to another in a thread-safe, deadlock-free manner.
      * Validates that both accounts exist, the amount is positive, and the accounts differ.
+     * Locks the two accounts in a globally consistent order (by account number) using synchronized blocks
+     * to eliminate circular-wait deadlock conditions.
      * Withdraws from the source account as TRANSFER_OUT, then deposits into the target as TRANSFER_IN.
      * If the deposit fails after the withdrawal, restores the source balance (manual rollback).
      *
@@ -107,7 +109,7 @@ public class Bank {
      * @throws InsufficientBalanceException if source account lacks required balance/overdraft
      * @throws IllegalArgumentException     if amount <= 0 or source and target accounts are the same
      */
-    public synchronized void transfer(String fromAcc, String toAcc, double amount)
+    public void transfer(String fromAcc, String toAcc, double amount)
             throws AccountNotFoundException, InsufficientBalanceException {
         if (fromAcc == null || toAcc == null) {
             throw new IllegalArgumentException("Source and target account numbers cannot be null");
@@ -122,15 +124,23 @@ public class Bank {
         Account source = getAccount(fromAcc.trim());
         Account target = getAccount(toAcc.trim());
 
-        // Step 1: Withdraw from source (recorded as TRANSFER_OUT)
-        source.transferOut(amount);
+        // Deadlock prevention: Lock the two accounts in a globally consistent order (by account number)
+        Account firstLock = source.getAccountNumber().compareTo(target.getAccountNumber()) < 0 ? source : target;
+        Account secondLock = source.getAccountNumber().compareTo(target.getAccountNumber()) < 0 ? target : source;
 
-        // Step 2: Deposit into target (recorded as TRANSFER_IN), with manual rollback on deposit failure
-        try {
-            target.transferIn(amount);
-        } catch (Exception e) {
-            source.restoreBalance(amount);
-            throw e;
+        synchronized (firstLock) {
+            synchronized (secondLock) {
+                // Step 1: Withdraw from source (recorded as TRANSFER_OUT)
+                source.transferOut(amount);
+
+                // Step 2: Deposit into target (recorded as TRANSFER_IN), with manual rollback on deposit failure
+                try {
+                    target.transferIn(amount);
+                } catch (Exception e) {
+                    source.restoreBalance(amount);
+                    throw e;
+                }
+            }
         }
     }
 
