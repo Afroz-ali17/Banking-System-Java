@@ -147,8 +147,8 @@ public class BankApp {
             double amount = scanner.nextDouble();
             scanner.nextLine(); // consume newline
 
+            bank.deposit(accNo, amount);
             Account account = bank.getAccount(accNo);
-            account.deposit(amount);
             System.out.printf("\n[Success] Deposited %.2f into %s. New Balance: %.2f%n",
                     amount, accNo, account.getBalance());
         });
@@ -165,8 +165,8 @@ public class BankApp {
             double amount = scanner.nextDouble();
             scanner.nextLine(); // consume newline
 
+            bank.withdraw(accNo, amount);
             Account account = bank.getAccount(accNo);
-            account.withdraw(amount);
             System.out.printf("\n[Success] Withdrew %.2f from %s. New Balance: %.2f%n",
                     amount, accNo, account.getBalance());
         });

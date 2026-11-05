@@ -1,5 +1,7 @@
 package com.afroz.bank;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -8,19 +10,71 @@ import java.util.Map;
 
 /**
  * Manages bank accounts using a HashMap for fast O(1) lookups by account number.
+ * Supports persistent storage via AccountDAO and MySQL JDBC transactions.
  */
 public class Bank {
     // HashMap chosen for O(1) average-time lookups, insertions, and deletions by account number
     private final HashMap<String, Account> accounts = new HashMap<>();
+    private final AccountDAO accountDAO;
 
     // Sequential counters for generating account numbers
     private int nextSavingsNumber = 1001;
     private int nextCurrentNumber = 2001;
 
+    public Bank() {
+        this(new AccountDAO());
+    }
+
+    public Bank(AccountDAO accountDAO) {
+        this.accountDAO = accountDAO;
+        loadAccountsFromDatabase();
+    }
+
+    /**
+     * Loads existing accounts from the database on startup if database is configured.
+     * Also updates next account number counters to prevent ID collisions.
+     */
+    public synchronized void loadAccountsFromDatabase() {
+        if (accountDAO != null && DBConnection.isConfigured()) {
+            try {
+                List<Account> loadedAccounts = accountDAO.findAll();
+                for (Account account : loadedAccounts) {
+                    accounts.put(account.getAccountNumber(), account);
+                    updateNextAccountCounters(account.getAccountNumber());
+                }
+                if (!loadedAccounts.isEmpty()) {
+                    System.out.println("[Database] Successfully loaded " + loadedAccounts.size() + " accounts on startup.");
+                }
+            } catch (SQLException e) {
+                System.err.println("[Database Warning] Could not load accounts from database: " + e.getMessage());
+            }
+        }
+    }
+
+    private void updateNextAccountCounters(String accNo) {
+        if (accNo == null) return;
+        if (accNo.startsWith("SB")) {
+            try {
+                int num = Integer.parseInt(accNo.substring(2));
+                if (num >= nextSavingsNumber) {
+                    nextSavingsNumber = num + 1;
+                }
+            } catch (NumberFormatException ignored) {}
+        } else if (accNo.startsWith("CA")) {
+            try {
+                int num = Integer.parseInt(accNo.substring(2));
+                if (num >= nextCurrentNumber) {
+                    nextCurrentNumber = num + 1;
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+    }
+
     /**
      * Creates and registers a new account.
      * Generates numbers like SB1001 for Savings and CA2001 for Current accounts.
      * Rejects Savings accounts with an opening balance below 500.
+     * Persists the account to the database if configured.
      *
      * @param type    the account type ("SAVINGS" or "CURRENT")
      * @param name    the account holder's name
@@ -56,6 +110,17 @@ public class Bank {
         }
 
         accounts.put(account.getAccountNumber(), account);
+
+        // Persist to database if configured
+        if (accountDAO != null && DBConnection.isConfigured()) {
+            try {
+                accountDAO.save(account);
+                accountDAO.addTransaction(account.getAccountNumber(), "DEPOSIT", opening);
+            } catch (SQLException e) {
+                System.err.println("[Database Warning] Could not persist created account: " + e.getMessage());
+            }
+        }
+
         return account;
     }
 
@@ -78,7 +143,50 @@ public class Bank {
     }
 
     /**
+     * Deposits funds into an account and updates database persistence if configured.
+     *
+     * @param accNo  the account number
+     * @param amount the deposit amount
+     * @throws AccountNotFoundException if the account does not exist
+     */
+    public synchronized void deposit(String accNo, double amount) throws AccountNotFoundException {
+        Account account = getAccount(accNo);
+        account.deposit(amount);
+        if (accountDAO != null && DBConnection.isConfigured()) {
+            try {
+                accountDAO.updateBalance(accNo, account.getBalance());
+                accountDAO.addTransaction(accNo, "DEPOSIT", amount);
+            } catch (SQLException e) {
+                System.err.println("[Database Warning] Could not persist deposit: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Withdraws funds from an account and updates database persistence if configured.
+     *
+     * @param accNo  the account number
+     * @param amount the withdrawal amount
+     * @throws AccountNotFoundException     if the account does not exist
+     * @throws InsufficientBalanceException if withdrawal breaches balance rules
+     */
+    public synchronized void withdraw(String accNo, double amount)
+            throws AccountNotFoundException, InsufficientBalanceException {
+        Account account = getAccount(accNo);
+        account.withdraw(amount);
+        if (accountDAO != null && DBConnection.isConfigured()) {
+            try {
+                accountDAO.updateBalance(accNo, account.getBalance());
+                accountDAO.addTransaction(accNo, "WITHDRAW", amount);
+            } catch (SQLException e) {
+                System.err.println("[Database Warning] Could not persist withdrawal: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
      * Closes an existing account. The operation only succeeds if the account balance is 0.
+     * Deletes the account from the database if configured.
      *
      * @param accNo the account number to close
      * @return true if the account was successfully closed, false if balance is non-zero
@@ -91,16 +199,26 @@ public class Bank {
             return false;
         }
         accounts.remove(accNo);
+
+        // Delete from database if configured
+        if (accountDAO != null && DBConnection.isConfigured()) {
+            try {
+                accountDAO.delete(accNo);
+            } catch (SQLException e) {
+                System.err.println("[Database Warning] Could not delete closed account from DB: " + e.getMessage());
+            }
+        }
+
         return true;
     }
 
     /**
      * Transfers funds from one account to another in a thread-safe, deadlock-free manner.
-     * Validates that both accounts exist, the amount is positive, and the accounts differ.
-     * Locks the two accounts in a globally consistent order (by account number) using synchronized blocks
-     * to eliminate circular-wait deadlock conditions.
-     * Withdraws from the source account as TRANSFER_OUT, then deposits into the target as TRANSFER_IN.
-     * If the deposit fails after the withdrawal, restores the source balance (manual rollback).
+     * If database persistence is configured, uses a real JDBC transaction:
+     * - setAutoCommit(false)
+     * - both balance updates and transaction logs executed under the transaction
+     * - commit() on success
+     * - rollback() on any exception
      *
      * @param fromAcc source account number
      * @param toAcc   target account number
@@ -130,15 +248,65 @@ public class Bank {
 
         synchronized (firstLock) {
             synchronized (secondLock) {
-                // Step 1: Withdraw from source (recorded as TRANSFER_OUT)
-                source.transferOut(amount);
+                if (accountDAO != null && DBConnection.isConfigured()) {
+                    Connection conn = null;
+                    boolean committed = false;
+                    try {
+                        conn = DBConnection.getConnection();
+                        conn.setAutoCommit(false); // 1. Start JDBC Transaction
 
-                // Step 2: Deposit into target (recorded as TRANSFER_IN), with manual rollback on deposit failure
-                try {
-                    target.transferIn(amount);
-                } catch (Exception e) {
-                    source.restoreBalance(amount);
-                    throw e;
+                        // Withdraw from source (in-memory validation)
+                        source.transferOut(amount);
+
+                        // 2. Perform both balance updates and transaction inserts in DB
+                        accountDAO.updateBalance(conn, source.getAccountNumber(), source.getBalance());
+                        accountDAO.addTransaction(conn, source.getAccountNumber(), "TRANSFER_OUT", amount);
+
+                        double newTargetBalance = target.getBalance() + amount;
+                        accountDAO.updateBalance(conn, target.getAccountNumber(), newTargetBalance);
+                        accountDAO.addTransaction(conn, target.getAccountNumber(), "TRANSFER_IN", amount);
+
+                        // Apply in-memory target deposit
+                        target.transferIn(amount);
+
+                        // 3. Commit the transaction
+                        conn.commit();
+                        committed = true;
+                    } catch (Exception e) {
+                        if (conn != null && !committed) {
+                            try {
+                                conn.rollback(); // 4. Rollback on any exception
+                            } catch (SQLException rollbackEx) {
+                                System.err.println("[Database Error] Transaction rollback failed: " + rollbackEx.getMessage());
+                            }
+                        }
+                        // Manual in-memory rollback if source had already been deducted
+                        source.restoreBalance(amount);
+
+                        if (e instanceof InsufficientBalanceException) {
+                            throw (InsufficientBalanceException) e;
+                        } else if (e instanceof IllegalArgumentException) {
+                            throw (IllegalArgumentException) e;
+                        } else {
+                            throw new RuntimeException("Transfer transaction failed: " + e.getMessage(), e);
+                        }
+                    } finally {
+                        if (conn != null) {
+                            try {
+                                conn.setAutoCommit(true);
+                                conn.close();
+                            } catch (SQLException ignored) {}
+                        }
+                    }
+                } else {
+                    // In-memory fallback (when running without an active database)
+                    source.transferOut(amount);
+                    try {
+                        target.transferIn(amount);
+                    } catch (Exception e) {
+                        source.restoreBalance(amount);
+                        throw e;
+                    }
                 }
             }
         }

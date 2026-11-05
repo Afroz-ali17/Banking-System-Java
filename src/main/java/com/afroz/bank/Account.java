@@ -64,6 +64,15 @@ public abstract class Account {
         history.add(new Transaction(type, amount));
     }
 
+    /**
+     * Appends a transaction loaded from persistent storage into history.
+     */
+    public synchronized void addHistoricalTransaction(Transaction transaction) {
+        if (transaction != null) {
+            history.add(transaction);
+        }
+    }
+
     @Override
     public String toString() {
         return accountNumber + " | " + holderName + " | Balance: " + balance;

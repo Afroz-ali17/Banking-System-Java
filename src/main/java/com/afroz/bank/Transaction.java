@@ -8,9 +8,13 @@ public class Transaction {
     private final LocalDateTime time;
 
     public Transaction(String type, double amount) {
+        this(type, amount, LocalDateTime.now());
+    }
+
+    public Transaction(String type, double amount, LocalDateTime time) {
         this.type = type;
         this.amount = amount;
-        this.time = LocalDateTime.now();
+        this.time = (time != null) ? time : LocalDateTime.now();
     }
 
     public String getType() { return type; }

@@ -20,9 +20,18 @@
         <maven.compiler.release>21</maven.compiler.release>
         <!-- Centralize JUnit version for easy upgrades -->
         <junit.jupiter.version>5.10.2</junit.jupiter.version>
+        <!-- MySQL JDBC Connector version -->
+        <mysql.connector.version>8.3.0</mysql.connector.version>
     </properties>
 
     <dependencies>
+        <!-- MySQL Connector/J for JDBC database persistence -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>${mysql.connector.version}</version>
+        </dependency>
+
         <!-- JUnit 5 aggregator dependency scoped to 'test' so test libraries are excluded from production JAR -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
