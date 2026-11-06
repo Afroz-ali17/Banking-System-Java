@@ -115,8 +115,8 @@ class BankTest {
     // =========================================================================
 
     @Test
-    @DisplayName("transfer successfully moves funds and records TRANSFER_OUT and TRANSFER_IN")
-    void testTransferSuccess() throws AccountNotFoundException, InsufficientBalanceException {
+    @DisplayName("transfer moves money correctly")
+    void testTransferMovesMoneyCorrectly() throws AccountNotFoundException, InsufficientBalanceException {
         Account source = bank.createAccount("SAVINGS", "Alice", 5000);
         Account target = bank.createAccount("CURRENT", "Bob", 1000);
 
@@ -157,8 +157,8 @@ class BankTest {
     }
 
     @Test
-    @DisplayName("transfer throws AccountNotFoundException when source or target account is unknown")
-    void testTransferUnknownAccounts() {
+    @DisplayName("transfer to an unknown account throws AccountNotFoundException")
+    void testTransferToUnknownAccountThrowsAccountNotFoundException() {
         Account source = bank.createAccount("SAVINGS", "Alice", 1000);
 
         assertThrows(AccountNotFoundException.class,

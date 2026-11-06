@@ -8,8 +8,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class AccountTest {
 
     @Test
-    @DisplayName("Deposit increases balance and appends to transaction log")
-    void testDepositSuccess() {
+    @DisplayName("deposit increases balance")
+    void testDepositIncreasesBalance() {
         Account account = new SavingsAccount("SB1001", "Afroz", 1000);
         account.deposit(500);
 
@@ -37,16 +37,16 @@ class AccountTest {
     }
 
     @Test
-    @DisplayName("Savings account rejects withdrawal that breaches the 500 min balance threshold")
-    void testSavingsWithdrawBreachingMinBalance() {
+    @DisplayName("Savings rejects a withdrawal below the minimum balance")
+    void testSavingsRejectsWithdrawalBelowMinimumBalance() {
         Account account = new SavingsAccount("SB1001", "Afroz", 1000);
         // Attempting to withdraw 600 leaves 400, violating minimum balance of 500
         assertThrows(InsufficientBalanceException.class, () -> account.withdraw(600));
     }
 
     @Test
-    @DisplayName("Current account allows overdraft limit up to 5000 beyond balance")
-    void testCurrentAccountOverdraftSuccess() throws InsufficientBalanceException {
+    @DisplayName("Current allows overdraft within the limit")
+    void testCurrentAllowsOverdraftWithinLimit() throws InsufficientBalanceException {
         Account account = new CurrentAccount("CA2001", "Ali", 2000);
         account.withdraw(6000); // 2000 + 5000 overdraft = 7000 max capacity
 
