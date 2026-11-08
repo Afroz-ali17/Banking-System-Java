@@ -1,7 +1,9 @@
 package com.afroz.bank;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 public abstract class Account {
     private final String accountNumber;
@@ -10,22 +12,36 @@ public abstract class Account {
     private final List<Transaction> history = new ArrayList<>();
 
     protected Account(String accountNumber, String holderName, double openingBalance) {
-        this.accountNumber = accountNumber;
-        this.holderName = holderName;
+        if (accountNumber == null || accountNumber.trim().isEmpty()) {
+            throw new IllegalArgumentException("Account number cannot be null or empty");
+        }
+        if (holderName == null || holderName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Holder name cannot be null or empty");
+        }
+        this.accountNumber = accountNumber.trim();
+        this.holderName = holderName.trim();
         this.balance = openingBalance;
     }
 
     public String getAccountNumber() { return accountNumber; }
     public String getHolderName() { return holderName; }
-    public double getBalance() { return balance; }
-    public List<Transaction> getHistory() { return history; }
+
+    public synchronized double getBalance() {
+        return balance;
+    }
+
+    public synchronized List<Transaction> getHistory() {
+        return Collections.unmodifiableList(new ArrayList<>(history));
+    }
 
     public synchronized void deposit(double amount) {
         deposit(amount, "DEPOSIT");
     }
 
     public synchronized void deposit(double amount, String transactionType) {
-        if (amount <= 0) throw new IllegalArgumentException("Deposit must be positive");
+        if (Double.isNaN(amount) || Double.isInfinite(amount) || amount <= 0) {
+            throw new IllegalArgumentException("Deposit amount must be positive and finite. Provided: " + amount);
+        }
         balance += amount;
         record(transactionType, amount);
     }
@@ -60,7 +76,7 @@ public abstract class Account {
         }
     }
 
-    protected void record(String type, double amount) {
+    protected synchronized void record(String type, double amount) {
         history.add(new Transaction(type, amount));
     }
 
@@ -71,6 +87,19 @@ public abstract class Account {
         if (transaction != null) {
             history.add(transaction);
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Account account = (Account) o;
+        return Objects.equals(accountNumber, account.accountNumber);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(accountNumber);
     }
 
     @Override

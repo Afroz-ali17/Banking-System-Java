@@ -61,4 +61,50 @@ class AccountTest {
         // 2000 balance + 5000 overdraft limit = 7000 limit, so 7500 must fail
         assertThrows(InsufficientBalanceException.class, () -> account.withdraw(7500));
     }
+
+    @Test
+    @DisplayName("Account history list is unmodifiable to protect internal encapsulation")
+    void testHistoryEncapsulation() {
+        Account account = new SavingsAccount("SB1001", "Afroz", 1000);
+        account.deposit(200);
+        var history = account.getHistory();
+        assertThrows(UnsupportedOperationException.class, () -> history.add(new Transaction("TEST", 100)));
+        assertThrows(UnsupportedOperationException.class, history::clear);
+    }
+
+    @Test
+    @DisplayName("Deposit and withdraw reject NaN and infinite amounts")
+    void testRejectNaNAndInfiniteAmounts() {
+        Account account = new SavingsAccount("SB1001", "Afroz", 1000);
+        assertThrows(IllegalArgumentException.class, () -> account.deposit(Double.NaN));
+        assertThrows(IllegalArgumentException.class, () -> account.deposit(Double.POSITIVE_INFINITY));
+        assertThrows(IllegalArgumentException.class, () -> account.withdraw(Double.NaN));
+        assertThrows(IllegalArgumentException.class, () -> account.withdraw(Double.POSITIVE_INFINITY));
+    }
+
+    @Test
+    @DisplayName("SavingsAccount constructor directly enforces minimum balance of 500")
+    void testSavingsAccountConstructorValidation() {
+        assertThrows(IllegalArgumentException.class, () -> new SavingsAccount("SB1001", "Afroz", 499.99));
+        assertDoesNotThrow(() -> new SavingsAccount("SB1001", "Afroz", 500.00));
+    }
+
+    @Test
+    @DisplayName("CurrentAccount constructor rejects negative opening balance")
+    void testCurrentAccountConstructorValidation() {
+        assertThrows(IllegalArgumentException.class, () -> new CurrentAccount("CA2001", "Ali", -1.0));
+        assertDoesNotThrow(() -> new CurrentAccount("CA2001", "Ali", 0.0));
+    }
+
+    @Test
+    @DisplayName("Account equals and hashCode obey entity equality based on accountNumber")
+    void testEqualsAndHashCode() {
+        Account a1 = new SavingsAccount("SB1001", "Afroz", 1000);
+        Account a2 = new SavingsAccount("SB1001", "Afroz Different", 2000);
+        Account a3 = new SavingsAccount("SB1002", "Afroz", 1000);
+
+        assertEquals(a1, a2, "Accounts with identical account numbers must be equal");
+        assertEquals(a1.hashCode(), a2.hashCode(), "Equal accounts must produce identical hash codes");
+        assertNotEquals(a1, a3);
+    }
 }

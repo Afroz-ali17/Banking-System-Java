@@ -224,4 +224,18 @@ class BankTest {
         // Verify TRANSFER_OUT was removed from history during rollback
         assertTrue(testSource.getHistory().isEmpty());
     }
+
+    @Test
+    @DisplayName("getAccounts returns an unmodifiable defensive snapshot safe from concurrent modification")
+    void testGetAccountsDefensiveSnapshot() {
+        bank.createAccount("SAVINGS", "Alice", 1000);
+        var snapshot = bank.getAccounts();
+
+        assertThrows(UnsupportedOperationException.class, () -> snapshot.put("TEST", null));
+
+        // Modifying bank after getting snapshot must not affect snapshot size nor cause ConcurrentModificationException
+        bank.createAccount("CURRENT", "Bob", 2000);
+        assertEquals(1, snapshot.size());
+        assertEquals(2, bank.getAccountCount());
+    }
 }

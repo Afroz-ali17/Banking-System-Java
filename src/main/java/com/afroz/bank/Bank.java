@@ -150,6 +150,9 @@ public class Bank {
      * @throws AccountNotFoundException if the account does not exist
      */
     public synchronized void deposit(String accNo, double amount) throws AccountNotFoundException {
+        if (Double.isNaN(amount) || Double.isInfinite(amount) || amount <= 0) {
+            throw new IllegalArgumentException("Deposit amount must be positive. Provided: " + amount);
+        }
         Account account = getAccount(accNo);
         account.deposit(amount);
         if (accountDAO != null && DBConnection.isConfigured()) {
@@ -157,7 +160,10 @@ public class Bank {
                 accountDAO.updateBalance(accNo, account.getBalance());
                 accountDAO.addTransaction(accNo, "DEPOSIT", amount);
             } catch (SQLException e) {
-                System.err.println("[Database Warning] Could not persist deposit: " + e.getMessage());
+                try {
+                    account.withdraw(amount);
+                } catch (InsufficientBalanceException ignored) {}
+                throw new RuntimeException("Database error persisting deposit: " + e.getMessage(), e);
             }
         }
     }
@@ -172,6 +178,9 @@ public class Bank {
      */
     public synchronized void withdraw(String accNo, double amount)
             throws AccountNotFoundException, InsufficientBalanceException {
+        if (Double.isNaN(amount) || Double.isInfinite(amount) || amount <= 0) {
+            throw new IllegalArgumentException("Withdrawal amount must be positive. Provided: " + amount);
+        }
         Account account = getAccount(accNo);
         account.withdraw(amount);
         if (accountDAO != null && DBConnection.isConfigured()) {
@@ -179,7 +188,8 @@ public class Bank {
                 accountDAO.updateBalance(accNo, account.getBalance());
                 accountDAO.addTransaction(accNo, "WITHDRAW", amount);
             } catch (SQLException e) {
-                System.err.println("[Database Warning] Could not persist withdrawal: " + e.getMessage());
+                account.deposit(amount);
+                throw new RuntimeException("Database error persisting withdrawal: " + e.getMessage(), e);
             }
         }
     }
@@ -235,7 +245,7 @@ public class Bank {
         if (fromAcc.trim().equalsIgnoreCase(toAcc.trim())) {
             throw new IllegalArgumentException("Cannot transfer to the same account: " + fromAcc);
         }
-        if (amount <= 0) {
+        if (Double.isNaN(amount) || Double.isInfinite(amount) || amount <= 0) {
             throw new IllegalArgumentException("Transfer amount must be positive. Provided: " + amount);
         }
 
@@ -336,7 +346,7 @@ public class Bank {
      * @return unmodifiable map of account numbers to Account instances
      */
     public synchronized Map<String, Account> getAccounts() {
-        return Collections.unmodifiableMap(accounts);
+        return Collections.unmodifiableMap(new HashMap<>(accounts));
     }
 
     /**
